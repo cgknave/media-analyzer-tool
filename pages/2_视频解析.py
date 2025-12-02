@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 import base64
 import requests
-import tqdm
 from PIL import Image
 import io
 import streamlit as st
@@ -99,10 +98,29 @@ st.markdown(f"""
             overflow: hidden;
             border: 1px solid #444;
         }}
+        /* 关键帧预览 */
+        .keyframes-container {{
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 8px 0;
+            margin: 16px 0;
+        }}
+        .keyframe-item {{
+            min-width: 120px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }}
+        .keyframe-item:hover {{
+            border-color: {current_color["accent"]};
+            transform: scale(1.05);
+        }}
     </style>
 """, unsafe_allow_html=True)
 
-# ---------------------- 3. 核心工具函数 ----------------------
+# ---------------------- 3. 核心工具函数（优化设计师参考价值）----------------------
 def video_to_keyframes(video_file):
     # 保存临时视频
     temp_video_path = "temp_video.mp4"
@@ -114,7 +132,7 @@ def video_to_keyframes(video_file):
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     duration = round(total_frames / fps, 1)  # 视频时长（秒）
     keyframes = []
-    frame_interval = fps  # 每秒1帧
+    frame_interval = max(1, fps // 2)  # 每0.5秒1帧（更密集，便于设计参考）
     
     # 提取关键帧
     with st.spinner(f"📹 提取关键帧（共{total_frames}帧，时长{duration}秒）..."):
@@ -127,7 +145,7 @@ def video_to_keyframes(video_file):
             if frame_idx % frame_interval == 0:
                 frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 frame_pil = Image.fromarray(frame_rgb)
-                frame_pil.thumbnail((640, 360))
+                frame_pil.thumbnail((320, 180))  # 缩小预览图
                 keyframes.append(frame_pil)
             frame_idx += 1
             progress_bar.progress(min(frame_idx / total_frames, 1.0))
@@ -140,29 +158,30 @@ def image_to_base64(image):
     image.save(img_byte_arr, format="JPEG")
     return base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
 
-def analyze_video(video_file):
+def analyze_video_design(video_file):
     # 提取关键帧
     keyframes, fps, duration = video_to_keyframes(video_file)
     if len(keyframes) == 0:
         return "❌ 视频帧提取失败，请更换视频文件重试（建议MP4格式，时长≤30秒）"
     
-    # 关键帧转Base64（最多取10帧）
-    base64_frames = [image_to_base64(frame) for frame in keyframes[:10]]
+    # 关键帧转Base64（最多取15帧，更全面）
+    base64_frames = [image_to_base64(frame) for frame in keyframes[:15]]
     
-    # 调用API分析
+    # 调用API分析（突出设计参考价值）
     url = "https://api-inference.modelscope.cn/v1/chat/completions"
     headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
     messages = [
         {
             "role": "user",
             "content": [
-                {"type": "text", "text": f"""以下是视频的{len(base64_frames)}个关键帧（每秒1帧，总时长{duration}秒），分析后输出结构化结果：
-1. 核心主体：贯穿始终的人物/物体
-2. 画面风格：艺术风格+色彩基调
-3. 运镜手法：运镜类型+移动速度
-4. 分镜头：镜头切换点+每个镜头时长
-5. 场景转换：场景类型+转换方式
-分点清晰呈现，简洁明了"""}
+                {"type": "text", "text": f"""作为平面设计师的视频参考工具，分析以下{len(base64_frames)}个关键帧（每秒2帧，总时长{duration}秒），输出结构化设计参考：
+1. 视觉风格：整体设计风格（如极简/复古/国潮）+ 风格统一逻辑
+2. 色彩系统：主色调+色彩变化规律（便于动态设计参考）
+3. 构图技巧：镜头构图规则+视角变化（分镜头设计参考）
+4. 元素设计：核心视觉元素+元素运动规律（动态元素参考）
+5. 光影运用：布光方式+光影变化（动态光影参考）
+6. 设计借鉴：适合应用的设计场景+可复用的设计技巧
+分点清晰，突出设计参考价值，简洁实用"""}
             ]
         }
     ]
@@ -180,11 +199,24 @@ def analyze_video(video_file):
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
 
-# ---------------------- 4. 页面核心逻辑（修复text_area参数）----------------------
+# 导出关键帧为图片包
+def export_keyframes(keyframes):
+    # 创建ZIP文件
+    import zipfile
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        for idx, frame in enumerate(keyframes):
+            img_byte_arr = io.BytesIO()
+            frame.save(img_byte_arr, format="PNG")
+            zip_file.writestr(f"关键帧_{idx+1}.png", img_byte_arr.getvalue())
+    zip_buffer.seek(0)
+    return zip_buffer
+
+# ---------------------- 4. 页面核心逻辑（新增设计师友好功能）----------------------
 def main():
     # 页面标题
-    st.markdown(f"<h1 class='page-title'>🎬 视频全维度分析</h1>", unsafe_allow_html=True)
-    st.markdown("<p class='hint-text'>支持MP4/AVI/MKV格式，单文件≤200MB，建议时长≤30秒（分析约10-20秒）</p>", unsafe_allow_html=True)
+    st.markdown(f"<h1 class='page-title'>🎬 视频设计参考工具</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='hint-text'>支持MP4/AVI/MKV格式，单文件≤200MB，提取动态设计参考（适合短视频/动态海报设计）</p>", unsafe_allow_html=True)
 
     # 1. 视频上传+预览区域
     with st.container():
@@ -198,7 +230,13 @@ def main():
                 key="video_upload",
                 label_visibility="collapsed"
             )
-            analyze_btn = st.button("🎯 开始视频分析", type="primary", use_container_width=True)
+            st.markdown("<div class='btn-group'>", unsafe_allow_html=True)
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                analyze_btn = st.button("📊 设计分析", type="primary", use_container_width=True)
+            with col_btn2:
+                export_frames_btn = st.button("📥 导出关键帧", use_container_width=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         
         # 视频信息+预览（右侧）
         with col2:
@@ -211,36 +249,90 @@ def main():
                 st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 2. 结果展示区域（移除use_container_width参数）
+    # 2. 关键帧预览区域
+    if uploaded_video:
+        with st.container():
+            st.markdown('<div class="func-card">', unsafe_allow_html=True)
+            st.subheader("🎞️ 关键帧预览（设计参考用）")
+            
+            # 提取关键帧（缓存避免重复计算）
+            if "keyframes" not in st.session_state or st.session_state.get("video_name") != uploaded_video.name:
+                keyframes, fps, duration = video_to_keyframes(uploaded_video)
+                st.session_state.keyframes = keyframes
+                st.session_state.fps = fps
+                st.session_state.duration = duration
+                st.session_state.video_name = uploaded_video.name
+            else:
+                keyframes = st.session_state.keyframes
+                fps = st.session_state.fps
+                duration = st.session_state.duration
+            
+            # 横向滚动显示关键帧
+            st.markdown('<div class="keyframes-container">', unsafe_allow_html=True)
+            for idx, frame in enumerate(keyframes[:20]):  # 最多显示20帧
+                st.markdown(f'<div class="keyframe-item">', unsafe_allow_html=True)
+                st.image(frame, caption=f"帧{idx+1}", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown(f"📝 关键帧信息：共{len(keyframes)}帧 | 帧率：{fps}fps | 时长：{duration}秒")
+            
+            # 导出关键帧按钮功能
+            if export_frames_btn:
+                try:
+                    with st.spinner("📥 正在打包关键帧..."):
+                        zip_data = export_keyframes(keyframes)
+                        st.download_button(
+                            label="✅ 下载关键帧包（ZIP）",
+                            data=zip_data,
+                            file_name="视频关键帧.zip",
+                            mime="application/zip",
+                            use_container_width=True
+                        )
+                except Exception as e:
+                    st.error(f"❌ 导出失败：{str(e)}", icon="⚠️")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    # 3. 结果展示区域
     with st.container():
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
-        st.subheader("📝 分析结果")
+        st.subheader("📝 设计参考分析结果")
         
         # 初始化结果文本框
         result_placeholder = st.empty()
         with result_placeholder.container():
             st.text_area(
-                "分析结果将显示在这里（可直接复制）",
+                "分析结果将显示在这里（包含风格/色彩/构图/元素参考）",
                 height=350,
                 key="video_result",
-                placeholder="点击上方按钮开始分析..."
+                placeholder="点击「设计分析」按钮开始..."
             )
 
         # 分析逻辑执行
         if analyze_btn and uploaded_video:
             try:
-                with st.spinner("🔍 正在分析视频内容...（关键帧提取+AI分析）"):
-                    result = analyze_video(uploaded_video)
-                    # 更新结果文本框（移除use_container_width参数）
+                with st.spinner("🔍 正在分析视频设计元素...（关键帧提取+AI分析）"):
+                    result = analyze_video_design(uploaded_video)
+                    # 更新结果文本框
                     with result_placeholder.container():
                         st.text_area(
-                            "✅ 分析完成",
-                            value=result,
+                            "✅ 设计分析完成（可直接复制参考）",
                             height=350,
-                            key="video_result_active"
+                            key="video_result_active",
+                            value=result
                         )
             except Exception as e:
                 st.error(f"❌ 分析失败：{str(e)}", icon="⚠️")
+        
+        # 导出分析报告
+        if st.session_state.get("video_result_active"):
+            st.download_button(
+                label="📥 导出分析报告（TXT）",
+                data=st.session_state.get("video_result_active", ""),
+                file_name="视频设计分析报告.txt",
+                mime="text/plain",
+                use_container_width=True
+            )
         st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
