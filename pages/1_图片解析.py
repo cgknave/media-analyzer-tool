@@ -116,3 +116,38 @@ with st.container():
         except Exception as e:
             st.error(f"分析失败：{str(e)}")
     st.markdown('</div>', unsafe_allow_html=True)
+
+# 新增：封装页面核心功能到main()函数，供st.navigation调用
+if __name__ == "__main__":
+    # 这里的代码就是原页面的核心逻辑，直接复制原文件的所有代码（除了导入语句）到这里
+    # 以下是完整的main()函数内容，直接替换原文件末尾即可：
+    def main():
+        st.title("📷 图片细化分析")
+
+        # 1. 图片上传+分析按钮（功能卡片）
+        with st.container():
+            st.markdown('<div class="func-card">', unsafe_allow_html=True)
+            uploaded_img = st.file_uploader("上传图片（JPG/PNG/WebP，≤200MB）", type=["jpg", "jpeg", "png", "webp"])
+            if uploaded_img:
+                img = Image.open(uploaded_img).convert("RGB")
+                st.image(img, caption="图片预览", use_container_width=True, clamp=True, width=300)
+            analyze_btn = st.button("🚀 开始图片分析", type="primary")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # 2. 结果展示框（功能卡片）
+            with st.container():
+                st.markdown('<div class="func-card">', unsafe_allow_html=True)
+                st.subheader("📝 分析结果")
+                result_box = st.text_area("分析结果将显示在这里（可直接复制）", height=300, disabled=True, key="img_result")
+            
+                if analyze_btn and uploaded_img:
+                    try:
+                        with st.spinner("分析中...（约3-5秒）"):
+                            result = analyze_image(img)
+                            st.text_area("✅ 分析完成", value=result, height=300, key="img_result_active")
+                    except Exception as e:
+                        st.error(f"分析失败：{str(e)}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+    # 执行main()函数
+    main()
