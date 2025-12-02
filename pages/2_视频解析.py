@@ -5,7 +5,6 @@ import requests
 from PIL import Image
 import io
 import streamlit as st
-
 # ---------------------- 1. 共享配置（API密钥+颜色同步）----------------------
 API_KEY = "ms-9f99616d-d3cf-4783-922a-1ed9599fec3a"
 COLOR_SCHEMES = [
@@ -16,7 +15,6 @@ COLOR_SCHEMES = [
     {"bg": "#1B3B2A", "card": "#2B5C45", "btn": "#22C55E", "accent": "#4ADE80"}
 ]
 current_color = COLOR_SCHEMES[st.session_state.get("color_idx", 0)]
-
 # ---------------------- 2. 界面样式（增强视觉层次）----------------------
 st.markdown(f"""
     <style>
@@ -98,28 +96,8 @@ st.markdown(f"""
             overflow: hidden;
             border: 1px solid #444;
         }}
-        /* 关键帧预览 */
-        .keyframes-container {{
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            padding: 8px 0;
-            margin: 16px 0;
-        }}
-        .keyframe-item {{
-            min-width: 120px;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 2px solid transparent;
-            transition: all 0.3s ease;
-        }}
-        .keyframe-item:hover {{
-            border-color: {current_color["accent"]};
-            transform: scale(1.05);
-        }}
     </style>
 """, unsafe_allow_html=True)
-
 # ---------------------- 3. 核心工具函数（优化设计师参考价值）----------------------
 def video_to_keyframes(video_file):
     # 保存临时视频
@@ -134,7 +112,7 @@ def video_to_keyframes(video_file):
     keyframes = []
     frame_interval = max(1, fps // 2)  # 每0.5秒1帧（更密集，便于设计参考）
     
-    # 提取关键帧
+    # 提取关键帧（不展示，仅用于分析）
     with st.spinner(f"📹 提取关键帧（共{total_frames}帧，时长{duration}秒）..."):
         progress_bar = st.progress(0)
         frame_idx = 0
@@ -152,12 +130,10 @@ def video_to_keyframes(video_file):
     
     cap.release()
     return keyframes, fps, duration
-
 def image_to_base64(image):
     img_byte_arr = io.BytesIO()
     image.save(img_byte_arr, format="JPEG")
     return base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
-
 def analyze_video_design(video_file):
     # 提取关键帧
     keyframes, fps, duration = video_to_keyframes(video_file)
@@ -198,7 +174,6 @@ def analyze_video_design(video_file):
     response = requests.post(url, headers=headers, json=payload, timeout=90)
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
-
 # 导出关键帧为图片包
 def export_keyframes(keyframes):
     # 创建ZIP文件
@@ -211,13 +186,11 @@ def export_keyframes(keyframes):
             zip_file.writestr(f"关键帧_{idx+1}.png", img_byte_arr.getvalue())
     zip_buffer.seek(0)
     return zip_buffer
-
-# ---------------------- 4. 页面核心逻辑（新增设计师友好功能）----------------------
+# ---------------------- 4. 页面核心逻辑（不展示每一帧）----------------------
 def main():
     # 页面标题
     st.markdown(f"<h1 class='page-title'>🎬 视频设计参考工具</h1>", unsafe_allow_html=True)
     st.markdown("<p class='hint-text'>支持MP4/AVI/MKV格式，单文件≤200MB，提取动态设计参考（适合短视频/动态海报设计）</p>", unsafe_allow_html=True)
-
     # 1. 视频上传+预览区域
     with st.container():
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
@@ -248,12 +221,11 @@ def main():
                 st.video(uploaded_video, format="video/mp4")
                 st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
-    # 2. 关键帧预览区域
+    # 2. 关键帧信息区域（不展示画面，仅显示统计信息）
     if uploaded_video:
         with st.container():
             st.markdown('<div class="func-card">', unsafe_allow_html=True)
-            st.subheader("🎞️ 关键帧预览（设计参考用）")
+            st.subheader("🎞️ 关键帧统计（设计参考用）")
             
             # 提取关键帧（缓存避免重复计算）
             if "keyframes" not in st.session_state or st.session_state.get("video_name") != uploaded_video.name:
@@ -267,15 +239,9 @@ def main():
                 fps = st.session_state.fps
                 duration = st.session_state.duration
             
-            # 横向滚动显示关键帧
-            st.markdown('<div class="keyframes-container">', unsafe_allow_html=True)
-            for idx, frame in enumerate(keyframes[:20]):  # 最多显示20帧
-                st.markdown(f'<div class="keyframe-item">', unsafe_allow_html=True)
-                st.image(frame, caption=f"帧{idx+1}", use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
+            # 仅显示关键帧统计信息，不展示画面
             st.markdown(f"📝 关键帧信息：共{len(keyframes)}帧 | 帧率：{fps}fps | 时长：{duration}秒")
+            st.markdown("💡 关键帧已后台提取，可直接进行设计分析或导出")
             
             # 导出关键帧按钮功能
             if export_frames_btn:
@@ -292,7 +258,6 @@ def main():
                 except Exception as e:
                     st.error(f"❌ 导出失败：{str(e)}", icon="⚠️")
             st.markdown('</div>', unsafe_allow_html=True)
-
     # 3. 结果展示区域
     with st.container():
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
@@ -307,7 +272,6 @@ def main():
                 key="video_result",
                 placeholder="点击「设计分析」按钮开始..."
             )
-
         # 分析逻辑执行
         if analyze_btn and uploaded_video:
             try:
@@ -334,6 +298,5 @@ def main():
                 use_container_width=True
             )
         st.markdown('</div>', unsafe_allow_html=True)
-
 if __name__ == "__main__":
     main()
