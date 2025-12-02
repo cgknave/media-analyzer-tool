@@ -9,43 +9,87 @@ import streamlit as st
 # ---------------------- 1. 共享配置（API密钥+颜色同步）----------------------
 API_KEY = "ms-9f99616d-d3cf-4783-922a-1ed9599fec3a"
 COLOR_SCHEMES = [
-    {"bg": "#121212", "card": "#1E1E1E", "btn": "#8B5CF6", "accent": "#8B5CF6"},
-    {"bg": "#1E1E2E", "card": "#2D2D44", "btn": "#6366F1", "accent": "#6366F1"},
-    {"bg": "#1A1E3B", "card": "#2A2F55", "btn": "#3B82F6", "accent": "#3B82F6"},
-    {"bg": "#2A1B3D", "card": "#3D2B5C", "btn": "#A855F7", "accent": "#A855F7"},
-    {"bg": "#1B3B2A", "card": "#2B5C45", "btn": "#22C55E", "accent": "#22C55E"}
+    {"bg": "#121212", "card": "#1E1E1E", "btn": "#8B5CF6", "accent": "#A78BFA"},
+    {"bg": "#1E1E2E", "card": "#2D2D44", "btn": "#6366F1", "accent": "#818CF8"},
+    {"bg": "#1A1E3B", "card": "#2A2F55", "btn": "#3B82F6", "accent": "#60A5FA"},
+    {"bg": "#2A1B3D", "card": "#3D2B5C", "btn": "#A855F7", "accent": "#C084FC"},
+    {"bg": "#1B3B2A", "card": "#2B5C45", "btn": "#22C55E", "accent": "#4ADE80"}
 ]
 current_color = COLOR_SCHEMES[st.session_state.get("color_idx", 0)]
 
-# ---------------------- 2. 界面样式 ----------------------
+# ---------------------- 2. 界面样式（增强视觉层次）----------------------
 st.markdown(f"""
     <style>
-        .stApp {{background-color: {current_color["bg"]}; color: #E0E0E0;}}
+        .stApp {{
+            background-color: {current_color["bg"]};
+            color: #E0E0E0;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }}
+        /* 功能卡片 - 阴影+圆角优化 */
         .func-card {{
             background-color: {current_color["card"]};
-            border-radius: 20px;
-            padding: 20px;
-            margin: 10px 0;
+            border-radius: 16px;
+            padding: 24px;
+            margin: 16px 0;
             border: 1px solid #333;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: box-shadow 0.3s ease;
         }}
+        .func-card:hover {{
+            box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+        }}
+        /* 按钮样式 */
         .stButton > button {{
             background-color: {current_color["btn"]};
             color: white;
             border-radius: 10px;
-            padding: 8px 16px;
+            padding: 10px 20px;
             border: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
         }}
-        .stButton > button:hover {{background-color: {current_color["accent"]};}}
+        .stButton > button:hover {{
+            background-color: {current_color["accent"]};
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.5);
+        }}
+        /* 输入框样式 */
         .stTextArea > div > textarea {{
             background-color: {current_color["card"]};
             color: #E0E0E0;
             border-radius: 10px;
             border: 1px solid #444;
+            padding: 12px;
+            transition: border-color 0.3s ease;
         }}
+        .stTextArea > div > textarea:focus {{
+            border-color: {current_color["accent"]};
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+        }}
+        /* 文件上传器 */
         .stFileUploader > div > div {{
             background-color: {current_color["card"]};
             border-radius: 10px;
-            border: 1px dashed #444;
+            border: 1px dashed #555;
+            padding: 32px;
+            transition: border-color 0.3s ease;
+        }}
+        .stFileUploader > div > div:hover {{
+            border-color: {current_color["accent"]};
+        }}
+        /* 标题样式 */
+        .page-title {{
+            color: {current_color["accent"]};
+            font-weight: 600;
+            margin-bottom: 8px;
+        }}
+        /* 提示文字 */
+        .hint-text {{
+            color: #999;
+            font-size: 14px;
+            margin-top: 8px;
         }}
     </style>
 """, unsafe_allow_html=True)
@@ -85,37 +129,65 @@ def analyze_image(image):
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
 
-# ---------------------- 4. 页面核心逻辑（修复file_uploader key缺失）----------------------
+# ---------------------- 4. 页面核心逻辑（删除无效框+优化流程）----------------------
 def main():
-    st.title("📷 图片细化分析")
+    # 页面标题
+    st.markdown(f"<h1 class='page-title'>📷 图片细化分析</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='hint-text'>支持JPG/PNG/WebP格式，单文件≤200MB，分析约3-5秒</p>", unsafe_allow_html=True)
 
-    # 1. 图片上传+分析按钮（添加唯一key）
+    # 1. 图片上传区域
     with st.container():
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
-        uploaded_img = st.file_uploader(
-            "上传图片（JPG/PNG/WebP，≤200MB）",
-            type=["jpg", "jpeg", "png", "webp"],
-            key="img_upload"  # 唯一标识，避免ID重复
-        )
-        if uploaded_img:
-            img = Image.open(uploaded_img).convert("RGB")
-            st.image(img, caption="图片预览", use_container_width=True, clamp=True, width=300)
-        analyze_btn = st.button("🚀 开始图片分析", type="primary")
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            uploaded_img = st.file_uploader(
+                "上传图片",
+                type=["jpg", "jpeg", "png", "webp"],
+                key="img_upload",
+                label_visibility="collapsed"
+            )
+            analyze_btn = st.button("🚀 开始图片分析", type="primary", use_container_width=True)
+        
+        # 图片预览（右侧）
+        with col2:
+            if uploaded_img:
+                img = Image.open(uploaded_img).convert("RGB")
+                st.image(
+                    img, 
+                    caption="预览图", 
+                    use_container_width=True, 
+                    clamp=True
+                )
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 2. 结果展示框
+    # 2. 结果展示区域（合并为单个输入框）
     with st.container():
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
         st.subheader("📝 分析结果")
-        result_box = st.text_area("分析结果将显示在这里（可直接复制）", height=300, disabled=True, key="img_result")
-    
+        result_text = st.text_area(
+            "分析结果将显示在这里（可直接复制）",
+            height=350,
+            key="img_result",
+            placeholder="点击上方按钮开始分析..."
+        )
+
+        # 分析逻辑执行
         if analyze_btn and uploaded_img:
             try:
-                with st.spinner("分析中...（约3-5秒）"):
+                with st.spinner("🔍 正在分析图片细节..."):
+                    img = Image.open(uploaded_img).convert("RGB")
                     result = analyze_image(img)
-                    st.text_area("✅ 分析完成", value=result, height=300, key="img_result_active")
+                    # 更新结果文本框
+                    st.text_area(
+                        "✅ 分析完成",
+                        value=result,
+                        height=350,
+                        key="img_result_active",
+                        use_container_width=True
+                    )
             except Exception as e:
-                st.error(f"分析失败：{str(e)}")
+                st.error(f"❌ 分析失败：{str(e)}", icon="⚠️")
         st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
