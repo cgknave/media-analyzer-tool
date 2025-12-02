@@ -423,6 +423,7 @@ def main():
                 # 导出色卡按钮
                 def export_color_card(colors):
                     # 创建色卡图片
+                    from PIL import ImageDraw
                     card_width = 800
                     card_height = 400
                     card = Image.new("RGB", (card_width, card_height), color="#ffffff")
@@ -452,8 +453,6 @@ def main():
                     card.save(img_byte_arr, format="PNG")
                     return img_byte_arr.getvalue()
                 
-                # 导入PIL的ImageDraw（延迟导入避免未使用时报错）
-                from PIL import ImageDraw
                 color_card_data = export_color_card(colors)
                 st.download_button(
                     label="📥 导出色卡（PNG）",
