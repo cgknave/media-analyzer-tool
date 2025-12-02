@@ -62,24 +62,6 @@ st.markdown(f"""
         .stNavigationItem:hover {{
             background-color: rgba(255,255,255,0.05) !important;
         }}
-        /* 标签页样式 */
-        .stTabs {{
-            --st-tab-color: #999;
-            --st-tab-active-color: {current_color["accent"]};
-            --st-tab-border-color: #444;
-            --st-tab-active-border-color: {current_color["accent"]};
-        }}
-        /* 按钮组样式 */
-        .btn-group {{
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            margin: 16px 0;
-        }}
-        .btn-group > button {{
-            flex: 1;
-            min-width: 120px;
-        }}
     </style>
     <!-- 颜色轮盘 + 点击事件 -->
     <div class="color-wheel" onclick="window.parent.streamlitCommandQueue.push({{'type':'setSessionState','args':{{'color_idx':{(st.session_state.color_idx + 1) % 5}}}}})"></div>
