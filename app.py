@@ -72,7 +72,6 @@ video_page = st.Page(
 pg = st.navigation(
     pages=[image_page, video_page],  # 用列表包裹，避免语法错误
     position="top",  # 固定顶部
-    layout="horizontal"  # 水平排列
 )
 
 # 运行当前选中的页面（必须加这一行，否则页面不显示）
