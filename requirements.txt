@@ -1,4 +1,4 @@
-streamlit
+streamlit>=1.32.0  # 强制安装1.32.0及以上版本，支持st.navigation
 requests
 Pillow
 opencv-python==4.10.0.84
