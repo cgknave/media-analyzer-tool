@@ -62,6 +62,24 @@ st.markdown(f"""
         .stNavigationItem:hover {{
             background-color: rgba(255,255,255,0.05) !important;
         }}
+        /* 标签页样式 */
+        .stTabs {{
+            --st-tab-color: #999;
+            --st-tab-active-color: {current_color["accent"]};
+            --st-tab-border-color: #444;
+            --st-tab-active-border-color: {current_color["accent"]};
+        }}
+        /* 按钮组样式 */
+        .btn-group {{
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 16px 0;
+        }}
+        .btn-group > button {{
+            flex: 1;
+            min-width: 120px;
+        }}
     </style>
     <!-- 颜色轮盘 + 点击事件 -->
     <div class="color-wheel" onclick="window.parent.streamlitCommandQueue.push({{'type':'setSessionState','args':{{'color_idx':{(st.session_state.color_idx + 1) % 5}}}}})"></div>
@@ -71,14 +89,14 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# ---------------------- 3. 顶部功能导航 ----------------------
+# ---------------------- 3. 顶部功能导航（新增设计工具集）----------------------
 st.set_page_config(
-    page_title="媒体解析工具",
-    page_icon="📽️",
+    page_title="设计师媒体解析工具",
+    page_icon="🎨",
     layout="wide"
 )
 
-# 定义两个功能页面
+# 定义三个功能页面
 image_page = st.Page(
     page="pages/1_图片解析.py",
     title="图片解析",
@@ -89,10 +107,15 @@ video_page = st.Page(
     title="视频解析",
     icon="🎬"
 )
+design_tool_page = st.Page(
+    page="pages/3_设计师工具集.py",
+    title="设计师工具集",
+    icon="🎨"
+)
 
 # 顶部导航
 pg = st.navigation(
-    pages=[image_page, video_page],
+    pages=[image_page, video_page, design_tool_page],
     position="top"
 )
 
