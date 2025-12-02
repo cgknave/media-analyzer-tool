@@ -8,7 +8,6 @@ import streamlit as st
 from collections import Counter
 from sklearn.cluster import KMeans
 import webcolors
-
 # ---------------------- 1. 共享配置（API密钥+颜色同步）----------------------
 API_KEY = "ms-9f99616d-d3cf-4783-922a-1ed9599fec3a"
 COLOR_SCHEMES = [
@@ -19,7 +18,6 @@ COLOR_SCHEMES = [
     {"bg": "#1B3B2A", "card": "#2B5C45", "btn": "#22C55E", "accent": "#4ADE80"}
 ]
 current_color = COLOR_SCHEMES[st.session_state.get("color_idx", 0)]
-
 # ---------------------- 2. 界面样式（增强视觉层次）----------------------
 st.markdown(f"""
     <style>
@@ -108,17 +106,8 @@ st.markdown(f"""
             font-weight: 500;
             text-shadow: 0 1px 2px rgba(0,0,0,0.3);
         }}
-        /* 材质卡片 */
-        .material-card {{
-            background-color: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 16px;
-            margin: 8px 0;
-            border-left: 3px solid {current_color["accent"]};
-        }}
     </style>
 """, unsafe_allow_html=True)
-
 # ---------------------- 3. 设计师专属工具函数 ----------------------
 # 3.1 配色提取（主色+辅助色+中性色）
 def extract_colors(image, n_colors=5):
@@ -166,56 +155,12 @@ def extract_colors(image, n_colors=5):
         "neutral": [{"rgb": c, "hex": rgb_to_hex(c), "cmyk": rgb_to_cmyk(c)} for c in neutral_colors]
     }
     return result
-
-# 3.2 材质纹理分析
-def analyze_material(image):
-    img_gray = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2GRAY)
-    
-    # 计算纹理特征（对比度、均匀度、熵）
-    glcm = cv2.calcHist([img_gray], [0], None, [256], [0, 256])
-    glcm = glcm / np.sum(glcm)
-    
-    contrast = 0
-    homogeneity = 0
-    entropy = 0
-    for i in range(256):
-        for j in range(256):
-            contrast += (i - j) ** 2 * glcm[i][j]
-            homogeneity += glcm[i][j] / (1 + abs(i - j))
-            if glcm[i][j] > 0:
-                entropy -= glcm[i][j] * np.log2(glcm[i][j])
-    
-    # 判断材质类型
-    material_type = ""
-    if contrast < 1000 and homogeneity > 0.05:
-        material_type = "光滑材质（如塑料、金属拉丝）"
-    elif contrast < 2000 and homogeneity > 0.03:
-        material_type = "半粗糙材质（如布料、皮革）"
-    else:
-        material_type = "粗糙材质（如石材、木材）"
-    
-    # 判断重复模式
-    repeat_pattern = "无明显重复"
-    if contrast < 1500:
-        repeat_pattern = "规则重复（适合无缝纹理）"
-    elif entropy > 5:
-        repeat_pattern = "随机纹理（无固定重复）"
-    
-    return {
-        "type": material_type,
-        "repeat_pattern": repeat_pattern,
-        "contrast": round(contrast, 2),
-        "homogeneity": round(homogeneity, 4),
-        "entropy": round(entropy, 2)
-    }
-
-# 3.3 图片转Base64
+# 3.2 图片转Base64
 def image_to_base64(image):
     img_byte_arr = io.BytesIO()
     image.save(img_byte_arr, format="JPEG")
     return base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
-
-# 3.4 OCR文字提取
+# 3.3 OCR文字提取
 def extract_text(image):
     img_base64 = image_to_base64(image)
     url = "https://api-inference.modelscope.cn/v1/ocr/text-recognition"
@@ -228,8 +173,7 @@ def extract_text(image):
     response.raise_for_status()
     result = response.json()
     return "\n".join([item["text"] for item in result["items"]]) if "items" in result else "未识别到文字"
-
-# 3.5 设计风格识别
+# 3.4 设计风格识别
 def recognize_design_style(image):
     img_base64 = image_to_base64(image)
     url = "https://api-inference.modelscope.cn/v1/chat/completions"
@@ -256,8 +200,7 @@ def recognize_design_style(image):
     response = requests.post(url, headers=headers, json=payload, timeout=60)
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
-
-# 3.6 核心分析函数
+# 3.5 核心分析函数
 def analyze_image_comprehensive(image):
     img_base64 = image_to_base64(image)
     url = "https://api-inference.modelscope.cn/v1/chat/completions"
@@ -286,13 +229,11 @@ def analyze_image_comprehensive(image):
     response = requests.post(url, headers=headers, json=payload, timeout=60)
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
-
 # ---------------------- 4. 页面核心逻辑（新增设计师功能标签页）----------------------
 def main():
     # 页面标题
     st.markdown(f"<h1 class='page-title'>📷 图片设计分析工具</h1>", unsafe_allow_html=True)
     st.markdown("<p class='hint-text'>支持JPG/PNG/WebP格式，单文件≤200MB，专为平面设计师优化</p>", unsafe_allow_html=True)
-
     # 1. 图片上传区域
     with st.container():
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
@@ -332,16 +273,13 @@ def main():
                 file_size = round(uploaded_img.size / 1024 / 1024, 2)
                 st.markdown(f"📁 大小：{file_size}MB")
         st.markdown('</div>', unsafe_allow_html=True)
-
-    # 2. 功能标签页（核心新增）
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    # 2. 功能标签页（删除材质分析）
+    tab1, tab2, tab3, tab4 = st.tabs([
         "📊 全面分析", 
         "🎨 配色提取", 
         "📝 文字识别", 
-        "🧩 材质分析", 
         "🎯 风格识别"
     ])
-
     # 初始化结果存储
     if "analysis_result" not in st.session_state:
         st.session_state.analysis_result = ""
@@ -349,11 +287,8 @@ def main():
         st.session_state.color_result = None
     if "text_result" not in st.session_state:
         st.session_state.text_result = ""
-    if "material_result" not in st.session_state:
-        st.session_state.material_result = None
     if "style_result" not in st.session_state:
         st.session_state.style_result = ""
-
     # 标签页1：全面分析
     with tab1:
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
@@ -386,7 +321,6 @@ def main():
             except Exception as e:
                 st.error(f"❌ 分析失败：{str(e)}", icon="⚠️")
         st.markdown('</div>', unsafe_allow_html=True)
-
     # 标签页2：配色提取
     with tab2:
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
@@ -467,7 +401,6 @@ def main():
         else:
             st.info("点击「提取配色」按钮，自动生成可复用的配色方案", icon="ℹ️")
         st.markdown('</div>', unsafe_allow_html=True)
-
     # 标签页3：文字识别
     with tab3:
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
@@ -510,51 +443,8 @@ def main():
                 use_container_width=True
             )
         st.markdown('</div>', unsafe_allow_html=True)
-
-    # 标签页4：材质分析
+    # 标签页4：风格识别
     with tab4:
-        st.markdown('<div class="func-card">', unsafe_allow_html=True)
-        st.subheader("材质纹理分析（设计材质参考）")
-        
-        if uploaded_img:
-            material_btn = st.button("🔍 分析材质", use_container_width=True)
-            if material_btn:
-                try:
-                    with st.spinner("🧩 正在分析材质纹理..."):
-                        img = Image.open(uploaded_img).convert("RGB")
-                        material_info = analyze_material(img)
-                        st.session_state.material_result = material_info
-                    
-                    # 显示材质分析结果
-                    st.markdown('<div class="material-card">', unsafe_allow_html=True)
-                    st.markdown(f"### 材质类型：{material_info['type']}")
-                    st.markdown(f"### 重复模式：{material_info['repeat_pattern']}")
-                    st.markdown(f"### 纹理参数：")
-                    st.markdown(f"- 对比度：{material_info['contrast']}（数值越高纹理越清晰）")
-                    st.markdown(f"- 均匀度：{material_info['homogeneity']}（数值越高材质越均匀）")
-                    st.markdown(f"- 熵值：{material_info['entropy']}（数值越高纹理越复杂）")
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # 材质应用建议
-                    st.markdown("### 设计应用建议")
-                    if "光滑材质" in material_info["type"]:
-                        st.markdown("- 适合用于科技产品、高端品牌设计")
-                        st.markdown("- 搭配高饱和度色彩，增强现代感")
-                    elif "半粗糙材质" in material_info["type"]:
-                        st.markdown("- 适合用于服装、家居类设计")
-                        st.markdown("- 搭配暖色调，增强亲和力")
-                    else:
-                        st.markdown("- 适合用于自然、复古类设计")
-                        st.markdown("- 搭配低饱和度色彩，增强质感")
-                    
-                except Exception as e:
-                    st.error(f"❌ 材质分析失败：{str(e)}", icon="⚠️")
-        else:
-            st.info("请先上传图片，再点击「分析材质」按钮", icon="ℹ️")
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # 标签页5：风格识别
-    with tab5:
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
         st.subheader("设计风格识别（学习参考）")
         
@@ -590,6 +480,5 @@ def main():
         else:
             st.info("请先上传图片，再点击「识别风格」按钮", icon="ℹ️")
         st.markdown('</div>', unsafe_allow_html=True)
-
 if __name__ == "__main__":
     main()
