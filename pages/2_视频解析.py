@@ -63,6 +63,7 @@ st.markdown(f"""
             border: 1px solid #444;
             padding: 12px;
             transition: border-color 0.3s ease;
+            width: 100% !important;
         }}
         .stTextArea > div > textarea:focus {{
             border-color: {current_color["accent"]};
@@ -179,7 +180,7 @@ def analyze_video(video_file):
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"]
 
-# ---------------------- 4. 页面核心逻辑（新增视频预览+删除无效框）----------------------
+# ---------------------- 4. 页面核心逻辑（修复text_area参数）----------------------
 def main():
     # 页面标题
     st.markdown(f"<h1 class='page-title'>🎬 视频全维度分析</h1>", unsafe_allow_html=True)
@@ -210,30 +211,34 @@ def main():
                 st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 2. 结果展示区域（合并为单个输入框）
+    # 2. 结果展示区域（移除use_container_width参数）
     with st.container():
         st.markdown('<div class="func-card">', unsafe_allow_html=True)
         st.subheader("📝 分析结果")
-        result_text = st.text_area(
-            "分析结果将显示在这里（可直接复制）",
-            height=350,
-            key="video_result",
-            placeholder="点击上方按钮开始分析..."
-        )
+        
+        # 初始化结果文本框
+        result_placeholder = st.empty()
+        with result_placeholder.container():
+            st.text_area(
+                "分析结果将显示在这里（可直接复制）",
+                height=350,
+                key="video_result",
+                placeholder="点击上方按钮开始分析..."
+            )
 
         # 分析逻辑执行
         if analyze_btn and uploaded_video:
             try:
                 with st.spinner("🔍 正在分析视频内容...（关键帧提取+AI分析）"):
                     result = analyze_video(uploaded_video)
-                    # 更新结果文本框
-                    st.text_area(
-                        "✅ 分析完成",
-                        value=result,
-                        height=350,
-                        key="video_result_active",
-                        use_container_width=True
-                    )
+                    # 更新结果文本框（移除use_container_width参数）
+                    with result_placeholder.container():
+                        st.text_area(
+                            "✅ 分析完成",
+                            value=result,
+                            height=350,
+                            key="video_result_active"
+                        )
             except Exception as e:
                 st.error(f"❌ 分析失败：{str(e)}", icon="⚠️")
         st.markdown('</div>', unsafe_allow_html=True)
