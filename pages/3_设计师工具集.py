@@ -14,7 +14,6 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.units import inch
-
 # ---------------------- 1. 共享配置（API密钥+颜色同步）----------------------
 API_KEY = "ms-9f99616d-d3cf-4783-922a-1ed9599fec3a"
 COLOR_SCHEMES = [
@@ -25,7 +24,6 @@ COLOR_SCHEMES = [
     {"bg": "#1B3B2A", "card": "#2B5C45", "btn": "#22C55E", "accent": "#4ADE80"}
 ]
 current_color = COLOR_SCHEMES[st.session_state.get("color_idx", 0)]
-
 # ---------------------- 2. 界面样式 ----------------------
 st.markdown(f"""
     <style>
@@ -116,14 +114,12 @@ st.markdown(f"""
         }}
     </style>
 """, unsafe_allow_html=True)
-
 # ---------------------- 3. 核心工具函数 ----------------------
 # 3.1 图片转Base64
 def image_to_base64(image):
     img_byte_arr = io.BytesIO()
     image.save(img_byte_arr, format="PNG")
     return base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
-
 # 3.2 智能抠图（主体分离）
 def remove_background(image):
     img_base64 = image_to_base64(image)
@@ -147,7 +143,6 @@ def remove_background(image):
     img_rgba.putalpha(Image.fromarray(alpha_channel))
     
     return img_rgba
-
 # 3.3 配色提取（基础版）
 def extract_colors(image, n_colors=5):
     img = image.resize((100, 100))  # 缩小图片提高效率
@@ -194,7 +189,6 @@ def extract_colors(image, n_colors=5):
         "neutral": [{"rgb": c, "hex": rgb_to_hex(c), "cmyk": rgb_to_cmyk(c)} for c in neutral_colors]
     }
     return result
-
 # 3.4 批量配色提取
 def batch_extract_colors(images):
     color_results = []
@@ -216,7 +210,6 @@ def batch_extract_colors(images):
             "colors": [{"rgb": c, "hex": rgb_to_hex(c)} for c in main_colors]
         })
     return color_results
-
 # 3.5 生成配色方案（基于配色模式）
 def generate_color_scheme(main_rgb, mode):
     r, g, b = main_rgb
@@ -294,7 +287,6 @@ def generate_color_scheme(main_rgb, mode):
     else:
         base_colors = extract_colors(Image.fromarray(np.uint8([[main_rgb]])))
         return base_colors
-
 # 3.6 生成配色色卡
 def generate_color_card(scheme):
     card_width = 800
@@ -324,4 +316,252 @@ def generate_color_card(scheme):
         for i, color in enumerate(scheme["neutral"]):
             x1 = i * neu_width
             x2 = (i+1) * neu_width
-            text_color = "white" if sum(color["rgb"])
+            text_color = "white" if sum(color["rgb"]) < 382 else "black"
+            draw.rectangle([x1, main_height + sec_height, x2, main_height + sec_height + neu_height], fill=color["hex"])
+            draw.text((x1 + 10, main_height + sec_height + 20), f"中性色{i+1}: {color['hex']}", fill=text_color, font_size=16)
+    
+    # 保存为BytesIO
+    img_byte_arr = io.BytesIO()
+    card.save(img_byte_arr, format="PNG")
+    return img_byte_arr.getvalue()
+
+# ---------------------- 4. 页面核心逻辑 ----------------------
+def main():
+    st.markdown(f"<h1 class='page-title'>🎨 设计师工具集</h1>", unsafe_allow_html=True)
+    st.markdown("<p class='hint-text'>整合配色提取、文字识别、智能抠图等核心工具，专为设计师高效工作打造</p>", unsafe_allow_html=True)
+    
+    # 工具标签页
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "🎨 配色提取与生成", 
+        "📝 文字提取", 
+        "✂️ 智能抠图", 
+        "📦 批量处理"
+    ])
+    
+    # 标签页1：配色提取与生成
+    with tab1:
+        st.markdown('<div class="func-card">', unsafe_allow_html=True)
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.subheader("图片配色提取")
+            uploaded_img = st.file_uploader(
+                "上传图片提取配色",
+                type=["jpg", "jpeg", "png", "webp"],
+                key="color_upload"
+            )
+            st.subheader("配色方案生成")
+            color_mode = st.selectbox(
+                "选择配色模式",
+                ["自动识别", "互补色配色", "相似色配色", "分割互补色", "三色配色"]
+            )
+            generate_btn = st.button("生成配色方案", use_container_width=True)
+        
+        with col2:
+            st.subheader("预览结果")
+            preview_placeholder = st.empty()
+            
+            if uploaded_img:
+                img = Image.open(uploaded_img).convert("RGB")
+                st.image(img, caption="原始图片", use_container_width=True, clamp=True)
+                
+                if generate_btn:
+                    with st.spinner("🎨 正在生成配色方案..."):
+                        # 提取主色
+                        colors = extract_colors(img)
+                        main_rgb = colors["main"]["rgb"]
+                        # 生成配色方案
+                        scheme = generate_color_scheme(main_rgb, color_mode)
+                        # 生成色卡
+                        color_card = generate_color_card(scheme)
+                        # 显示结果
+                        with preview_placeholder.container():
+                            st.image(color_card, caption=f"{color_mode}方案", use_container_width=True)
+                            
+                            # 显示配色详情
+                            st.markdown("### 配色详情")
+                            st.markdown(f"**主色**: {scheme['main']['hex']} | RGB: {scheme['main']['rgb']}")
+                            
+                            st.markdown("**辅助色**:")
+                            for idx, color in enumerate(scheme["secondary"]):
+                                st.markdown(f"- {color['hex']} | RGB: {color['rgb']}")
+                            
+                            if scheme["neutral"]:
+                                st.markdown("**中性色**:")
+                                for idx, color in enumerate(scheme["neutral"]):
+                                    st.markdown(f"- {color['hex']} | RGB: {color['rgb']}")
+                            
+                            # 下载按钮
+                            st.download_button(
+                                label="📥 下载配色色卡",
+                                data=color_card,
+                                file_name=f"{color_mode}色卡.png",
+                                mime="image/png",
+                                use_container_width=True
+                            )
+            else:
+                with preview_placeholder.container():
+                    st.info("上传图片后点击生成按钮，获取专业配色方案", icon="ℹ️")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 标签页2：文字提取
+    with tab2:
+        st.markdown('<div class="func-card">', unsafe_allow_html=True)
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.subheader("OCR文字提取")
+            uploaded_img = st.file_uploader(
+                "上传包含文字的图片",
+                type=["jpg", "jpeg", "png", "webp"],
+                key="text_upload"
+            )
+            extract_text_btn = st.button("提取文字", use_container_width=True)
+            
+            # 结果显示
+            result_placeholder = st.empty()
+            with result_placeholder.container():
+                st.text_area(
+                    "提取结果将显示在这里",
+                    height=200,
+                    placeholder="上传图片后点击提取按钮..."
+                )
+        
+        with col2:
+            st.subheader("图片预览")
+            img_placeholder = st.empty()
+            
+            if uploaded_img:
+                img = Image.open(uploaded_img).convert("RGB")
+                with img_placeholder.container():
+                    st.image(img, use_container_width=True, clamp=True)
+            
+            if extract_text_btn and uploaded_img:
+                try:
+                    with st.spinner("📝 正在识别文字..."):
+                        img_base64 = image_to_base64(img)
+                        url = "https://api-inference.modelscope.cn/v1/ocr/text-recognition"
+                        headers = {"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"}
+                        payload = {
+                            "image": img_base64,
+                            "parameters": {"detect_direction": True, "language": "ch"}
+                        }
+                        response = requests.post(url, headers=headers, json=payload, timeout=30)
+                        response.raise_for_status()
+                        result = response.json()
+                        text_result = "\n".join([item["text"] for item in result["items"]]) if "items" in result else "未识别到文字"
+                        
+                        # 更新结果
+                        with result_placeholder.container():
+                            st.text_area(
+                                "✅ 文字提取完成",
+                                height=200,
+                                value=text_result
+                            )
+                        
+                        # 下载按钮
+                        st.download_button(
+                            label="📥 下载文字",
+                            data=text_result,
+                            file_name="提取的文字.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                except Exception as e:
+                    st.error(f"❌ 提取失败：{str(e)}", icon="⚠️")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 标签页3：智能抠图
+    with tab3:
+        st.markdown('<div class="func-card">', unsafe_allow_html=True)
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.subheader("智能主体抠图")
+            uploaded_img = st.file_uploader(
+                "上传需要抠图的图片",
+                type=["jpg", "jpeg", "png", "webp"],
+                key="cutout_upload"
+            )
+            cutout_btn = st.button("开始抠图", use_container_width=True)
+        
+        with col2:
+            st.subheader("预览对比")
+            preview_placeholder = st.empty()
+            
+            if uploaded_img:
+                img = Image.open(uploaded_img).convert("RGB")
+                with preview_placeholder.container():
+                    st.image(img, caption="原始图片", use_container_width=True, clamp=True)
+                
+                if cutout_btn:
+                    try:
+                        with st.spinner("✂️ 正在抠图..."):
+                            result_img = remove_background(img)
+                            # 显示结果
+                            with preview_placeholder.container():
+                                st.image(result_img, caption="抠图结果（透明背景）", use_container_width=True)
+                                
+                                # 保存为PNG
+                                img_byte_arr = io.BytesIO()
+                                result_img.save(img_byte_arr, format="PNG")
+                                img_byte_arr.seek(0)
+                                
+                                # 下载按钮
+                                st.download_button(
+                                    label="📥 下载抠图结果",
+                                    data=img_byte_arr,
+                                    file_name="抠图结果.png",
+                                    mime="image/png",
+                                    use_container_width=True
+                                )
+                    except Exception as e:
+                        st.error(f"❌ 抠图失败：{str(e)}", icon="⚠️")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # 标签页4：批量处理
+    with tab4:
+        st.markdown('<div class="func-card">', unsafe_allow_html=True)
+        st.subheader("批量配色提取")
+        uploaded_imgs = st.file_uploader(
+            "上传多张图片（批量提取配色）",
+            type=["jpg", "jpeg", "png", "webp"],
+            key="batch_upload",
+            accept_multiple_files=True
+        )
+        batch_btn = st.button("批量提取", use_container_width=True)
+        
+        result_placeholder = st.empty()
+        with result_placeholder.container():
+            st.info("最多支持10张图片批量提取，自动生成每张图的主要配色", icon="ℹ️")
+        
+        if batch_btn and uploaded_imgs:
+            if len(uploaded_imgs) > 10:
+                st.warning("⚠️ 最多支持10张图片批量处理，已自动截取前10张", icon="⚠️")
+                uploaded_imgs = uploaded_imgs[:10]
+            
+            try:
+                with st.spinner("📦 正在批量提取配色..."):
+                    images = [Image.open(img).convert("RGB") for img in uploaded_imgs]
+                    batch_results = batch_extract_colors(images)
+                    
+                    with result_placeholder.container():
+                        st.markdown("### 批量配色提取结果")
+                        for res in batch_results:
+                            st.markdown(f"#### 图片{res['image_idx']}")
+                            cols = st.columns(len(res["colors"]))
+                            for idx, color in enumerate(res["colors"]):
+                                with cols[idx]:
+                                    st.markdown(f'<div class="color-block" style="background-color: {color["hex"]};">{color["hex"]}</div>', unsafe_allow_html=True)
+                                    st.markdown(f"RGB: {color['rgb']}")
+                            st.divider()
+            except Exception as e:
+                st.error(f"❌ 批量处理失败：{str(e)}", icon="⚠️")
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()
