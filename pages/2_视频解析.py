@@ -148,3 +148,36 @@ with st.container():
         except Exception as e:
             st.error(f"分析失败：{str(e)}")
     st.markdown('</div>', unsafe_allow_html=True)
+
+# 新增：封装页面核心功能到main()函数，供st.navigation调用
+if __name__ == "__main__":
+    def main():
+        st.title("🎬 视频全维度分析")
+
+        # 1. 视频上传+分析按钮（功能卡片）
+        with st.container():
+            st.markdown('<div class="func-card">', unsafe_allow_html=True)
+            uploaded_video = st.file_uploader("上传视频（MP4/AVI/MKV，≤200MB）", type=["mp4", "avi", "mkv"])
+            if uploaded_video:
+                video_size = round(uploaded_video.size / 1024 / 1024, 2)
+                st.markdown(f"📊 视频信息：{uploaded_video.name}（大小：{video_size}MB）")
+            analyze_btn = st.button("🎯 开始视频分析", type="primary")
+            st.markdown('</div>', unsafe_allow_html=True)
+
+            # 2. 结果展示框（功能卡片）
+            with st.container():
+                st.markdown('<div class="func-card">', unsafe_allow_html=True)
+                st.subheader("📝 分析结果")
+                result_box = st.text_area("分析结果将显示在这里（可直接复制）", height=300, disabled=True, key="video_result")
+            
+                if analyze_btn and uploaded_video:
+                    try:
+                        with st.spinner("分析中...（约10-20秒）"):
+                            result = analyze_video(uploaded_video)
+                            st.text_area("✅ 分析完成", value=result, height=300, key="video_result_active")
+                    except Exception as e:
+                        st.error(f"分析失败：{str(e)}")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+    # 执行main()函数
+    main()
